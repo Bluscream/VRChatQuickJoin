@@ -1,4 +1,7 @@
-﻿using System;
+﻿using File = System.IO.File;
+using Newtonsoft.Json;
+using OtpNet;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,14 +10,10 @@ using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
-using OtpNet;
-using Polly;
+using System.Web;
 using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
-using System.Web;
-using File = System.IO.File;
 
 class Program
 {
@@ -90,18 +89,21 @@ class Program
     }
     }
 
-    static async Task Main(string[] _args) {
+    static async Task Main(string[] _args)
+    {
         args = _args;
         string configFileName = $"{exeName}.json";
         string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configFileName);
         appConfig = LoadConfiguration();
-        var libConfig = new Configuration {
+        var libConfig = new Configuration
+        {
             UserAgent = "VRChatQuickJoin/1.0",
             Username = appConfig.Username,
             Password = appConfig.Password
         };
 
-        try {
+        try
+        {
             var client = new ApiClient();
             var authApi = new AuthenticationApi(client, client, libConfig);
             var worldsApi = new WorldsApi(client, client, libConfig);
@@ -130,14 +132,18 @@ class Program
                 Console.Write("Enter 2FA Code: ");
                 var code = Console.ReadLine();
                 authApi.Verify2FAEmailCode(new TwoFactorEmailCode(code));
-            } else {
+            }
+            else
+            {
                 Console.WriteLine("Regular 2FA required");
                 var code = string.Empty;
                 if (string.IsNullOrWhiteSpace(appConfig.TOTPSecret))
                 {
                     Console.Write("Enter 2FA Code: ");
                     code = Console.ReadLine();
-                } else {
+                }
+                else
+                {
                     var secretBytes = Base32Encoding.ToBytes(appConfig.TOTPSecret);
                     code = new Totp(secretBytes).ComputeTotp(DateTime.UtcNow);
                     Console.WriteLine($"Generated 2FA Code: {code}");
@@ -156,10 +162,12 @@ class Program
             }
             SaveConfiguration(appConfig);
 
-#region MAIN_LOGIC
+            #region MAIN_LOGIC
 
-            if (!string.IsNullOrWhiteSpace(appConfig.GroupId)) {
-                try {
+            if (!string.IsNullOrWhiteSpace(appConfig.GroupId))
+            {
+                try
+                {
                     Console.WriteLine($"Using Group ID: {appConfig.GroupId}");
                     var groupInstances = await groupApi.GetGroupInstancesAsync(appConfig.GroupId);
                     Console.WriteLine($"Found {groupInstances.Count} Group Instances");
@@ -172,12 +180,15 @@ class Program
                         Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
                         return;
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Console.WriteLine($"Error fetching group instances: {ex.Message}");
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(appConfig.WorldId)) {
+            if (!string.IsNullOrWhiteSpace(appConfig.WorldId))
+            {
                 try
                 {
                     Console.WriteLine($"Using World ID: {appConfig.WorldId}");
@@ -195,21 +206,31 @@ class Program
                         Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
                         return;
                     }
-                } catch (Exception ex) {
+                }
+                catch (Exception ex)
+                {
                     Console.WriteLine($"Error fetching world instances: {ex.Message}");
                 }
             }
 
             Extensions.StartGame(gameUri);
 
-#endregion MAIN_LOGIC
+            #endregion MAIN_LOGIC
 
         }
-        catch (ApiException ex) {
+        catch (ApiException ex)
+        {
             Console.WriteLine($"API Error: {ex.Message}");
             Console.WriteLine($"Status Code: {ex.ErrorCode}");
-        } catch (Exception ex) {
+        }
+        catch (Exception ex)
+        {
             Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            Console.WriteLine("Press any key to exit...");
+            Console.ReadKey();
         }
     }
 }
