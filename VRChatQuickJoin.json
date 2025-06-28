@@ -1,0 +1,7 @@
+{
+  "Username": "your_username",
+  "Password": "your_password",
+  "TOTPSecret": "",
+  "GroupId": "",
+  "WorldId": ""
+} 
