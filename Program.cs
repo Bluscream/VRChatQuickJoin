@@ -39,6 +39,7 @@ internal class Program
     public class AppConfig
     {
         //public bool Skip2FA { get; set; } = false;
+        public bool WaitOnExit { get; set; } = false;
         public bool FetchGroupDetails { get; set; } = false;
         public bool OverwriteComments { get; set; } = true;
         public string Username { get; set; } = "";
@@ -207,10 +208,14 @@ internal class Program
         {
             Console.WriteLine($"Error: {ex.Message}");
         }
-        finally
+        if (appConfig.WaitOnExit)
         {
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
+        }
+        else
+        {
+            Console.WriteLine("Exiting...");
         }
     }
 

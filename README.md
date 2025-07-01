@@ -12,6 +12,7 @@
 ## Example `VRChatQuickJoin.json`
 ```json
 {
+  "WaitOnExit": true,
   "FetchGroupDetails": true,
   "OverwriteComments": true,
   "Username": "",
