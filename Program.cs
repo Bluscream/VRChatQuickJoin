@@ -116,6 +116,7 @@ internal class Program
             var authApi = new AuthenticationApi(client, client, libConfig);
             var worldsApi = new WorldsApi(client, client, libConfig);
             var groupApi = new GroupsApi(client, client, libConfig);
+            var friendsApi = new FriendsApi(client, client, libConfig);
 
             Console.WriteLine("Logging in...");
             if (!string.IsNullOrWhiteSpace(appConfig.AuthCookie))
@@ -176,7 +177,7 @@ internal class Program
                 Console.WriteLine($"Trying {appConfig.Ids.Count} Locations");
                 foreach (var id in appConfig.Ids)
                 {
-                    if (await TryId(id, groupApi, worldsApi)) {
+                    if (await TryId(id, groupApi, worldsApi, friendsApi)) {
                         joined = true;
                         break;
                     }
@@ -205,7 +206,7 @@ internal class Program
         }
     }
 
-    static async Task<bool> TryId(string id, GroupsApi groupApi, WorldsApi worldsApi)
+    static async Task<bool> TryId(string id, GroupsApi groupApi, WorldsApi worldsApi, FriendsApi friendsApi)
     {
         if (id.StartsWith("grp_"))
         {
@@ -214,6 +215,10 @@ internal class Program
         else if (id.StartsWith("wrld_"))
         {
             return await TryWorldId(id, worldsApi);
+        }
+        else if (id.StartsWith("usr_"))
+        {
+            return await TryUserId(id, friendsApi, worldsApi);
         }
         else
         {
@@ -281,6 +286,45 @@ internal class Program
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching world instances for {worldId}: {ex.Message}");
+            return false;
+        }
+    }
+
+    static async Task<bool> TryUserId(string userId, FriendsApi friendsApi, WorldsApi worldsApi)
+    {
+        try
+        {
+            Console.WriteLine($"Trying User ID: {userId}");
+            var user = await friendsApi.GetFriendAsync(userId);
+            if (user == null)
+            {
+                Console.WriteLine($"User {userId} not found or not a friend.");
+                return false;
+            }
+            if (string.IsNullOrEmpty(user.Location) || user.Location == "offline" || user.Location == "private")
+            {
+                Console.WriteLine($"User {user.DisplayName} is not in a joinable location (Location: {user.Location}).");
+                return false;
+            }
+            Console.WriteLine($"User {user.DisplayName} is in location: {user.Location}");
+            // Location format: wrld_xxxx:instanceId~... or similar
+            var locationParts = user.Location.Split(':');
+            if (locationParts.Length < 2 || !locationParts[0].StartsWith("wrld_"))
+            {
+                Console.WriteLine($"User {user.DisplayName} is not in a joinable world instance.");
+                return false;
+            }
+            var worldId = locationParts[0];
+            var instanceId = locationParts[1];
+            var joinLink = Extensions.BuildJoinLink(worldId, instanceId);
+            Console.WriteLine($"Joining user {user.DisplayName} at {joinLink}");
+            var process = Extensions.StartGame(joinLink);
+            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching user {userId}: {ex.Message}");
             return false;
         }
     }
