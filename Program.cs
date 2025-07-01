@@ -40,8 +40,7 @@ internal class Program
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public string TOTPSecret { get; set; } = "";
-        public List<string> GroupIds { get; set; } = new List<string>();
-        public List<string> WorldIds { get; set; } = new List<string>();
+        public List<string> Ids { get; set; } = new List<string>();
         public string AuthCookie { get; set; } = "";
         public string TwoFactorAuthCookie { get; set; } = "";
         public string GameArguments { get; set; } = "";
@@ -172,73 +171,21 @@ internal class Program
             SaveConfiguration(appConfig);
 
 #region MAIN_LOGIC
-            if (appConfig.GroupIds != null && appConfig.GroupIds.Count > 0) {
-                Console.WriteLine($"Trying {appConfig.GroupIds.Count} Groups");
-                foreach (var groupId in appConfig.GroupIds)
+            bool joined = false;
+            if (appConfig.Ids != null && appConfig.Ids.Count > 0) {
+                Console.WriteLine($"Trying {appConfig.Ids.Count} Locations");
+                foreach (var id in appConfig.Ids)
                 {
-                    try
-                    {
-                        Console.WriteLine($"Trying Group ID: {groupId}");
-                        var groupInstances = await groupApi.GetGroupInstancesAsync(groupId);
-                        Console.WriteLine($"Found {groupInstances.Count} Group Instances");
-                        var instances = groupInstances.OrderByDescending(i => i.MemberCount);
-                        foreach (var instance in instances)
-                        {
-                            if (instance is null) continue;
-                            if (instance.MemberCount <= 0) continue; // Skip empty instances
-                            if (instance.MemberCount >= instance.World.Capacity) continue; // Skip full instances
-                            Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
-                            var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
-                            Console.WriteLine(joinLink);
-                            var process = Extensions.StartGame(joinLink);
-                            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
-                            return;
-                        }
-                        Console.WriteLine($"No matching instance found for group {groupId}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error fetching group instances for {groupId}: {ex.Message}");
+                    if (await TryId(id, groupApi, worldsApi)) {
+                        joined = true;
+                        break;
                     }
                 }
             }
-            Console.WriteLine("No Group IDs found, trying World IDs instead");
-            if (appConfig.WorldIds != null && appConfig.WorldIds.Count > 0) {
-                Console.WriteLine($"Trying {appConfig.WorldIds.Count} Worlds");
-                foreach (var worldId in appConfig.WorldIds)
-                {
-                    try
-                    {
-                        Console.WriteLine($"Trying World ID: {worldId}");
-                        var world = await worldsApi.GetWorldAsync(worldId);
-                        Console.WriteLine($"Resolved World: \"{world.Name}\" by \"{world.AuthorName}\"");
-                        var instances = world.Instances.OrderByDescending(i => i.Count);
-                        foreach (var _instance in instances) 
-                        {
-                            if (_instance is null) return;
-                            var validUserCount = int.TryParse(_instance[1].ToString(), out int userCount);
-                            if (validUserCount && userCount <= 0) continue; // Skip empty instances
-                            if (validUserCount && userCount >= _instance.Capacity) continue; // Skip full instances
-                            var InstanceId = _instance[0].ToString();
-                            var Location = $"{worldId}:{InstanceId}";
-                            Console.WriteLine($"Instance: {InstanceId} ({userCount})");
-                            var joinLink = Extensions.BuildJoinLink(worldId, InstanceId);
-                            Console.WriteLine(joinLink);
-                            var process = Extensions.StartGame(joinLink);
-                            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
-                            return;
-                        }
-                        Console.WriteLine($"No matching instance found for world {worldId}");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error fetching world instances for {worldId}: {ex.Message}");
-                    }
-                }
+            if (!joined)
+            {
+                Extensions.StartGame(gameUri);
             }
-
-            Extensions.StartGame(gameUri);
-
             #endregion MAIN_LOGIC
 
         }
@@ -255,6 +202,86 @@ internal class Program
         {
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
+        }
+    }
+
+    static async Task<bool> TryId(string id, GroupsApi groupApi, WorldsApi worldsApi)
+    {
+        if (id.StartsWith("grp_"))
+        {
+            return await TryGroupId(id, groupApi);
+        }
+        else if (id.StartsWith("wrld_"))
+        {
+            return await TryWorldId(id, worldsApi);
+        }
+        else
+        {
+            Console.WriteLine($"Unknown location id prefix: {id}");
+            return false;
+        }
+    }
+
+    static async Task<bool> TryGroupId(string groupId, GroupsApi groupApi)
+    {
+        try
+        {
+            Console.WriteLine($"Trying Group ID: {groupId}");
+            var groupInstances = await groupApi.GetGroupInstancesAsync(groupId);
+            Console.WriteLine($"Found {groupInstances.Count} Group Instances");
+            var instances = groupInstances.OrderByDescending(i => i.MemberCount);
+            foreach (var instance in instances)
+            {
+                if (instance is null) continue;
+                if (instance.MemberCount <= 0) continue; // Skip empty instances
+                if (instance.MemberCount >= instance.World.Capacity) continue; // Skip full instances
+                Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
+                var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
+                Console.WriteLine(joinLink);
+                var process = Extensions.StartGame(joinLink);
+                Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                return true;
+            }
+            Console.WriteLine($"No matching instance found for group {groupId}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching group instances for {groupId}: {ex.Message}");
+            return false;
+        }
+    }
+
+    static async Task<bool> TryWorldId(string worldId, WorldsApi worldsApi)
+    {
+        try
+        {
+            Console.WriteLine($"Trying World ID: {worldId}");
+            var world = await worldsApi.GetWorldAsync(worldId);
+            Console.WriteLine($"Resolved World: \"{world.Name}\" by \"{world.AuthorName}\"");
+            var instances = world.Instances.OrderByDescending(i => i.Count);
+            foreach (var _instance in instances)
+            {
+                if (_instance is null) return false;
+                var validUserCount = int.TryParse(_instance[1].ToString(), out int userCount);
+                if (validUserCount && userCount <= 0) continue; // Skip empty instances
+                if (validUserCount && userCount >= _instance.Capacity) continue; // Skip full instances
+                var InstanceId = _instance[0].ToString();
+                var Location = $"{worldId}:{InstanceId}";
+                Console.WriteLine($"Instance: {InstanceId} ({userCount})");
+                var joinLink = Extensions.BuildJoinLink(worldId, InstanceId);
+                Console.WriteLine(joinLink);
+                var process = Extensions.StartGame(joinLink);
+                Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                return true;
+            }
+            Console.WriteLine($"No matching instance found for world {worldId}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching world instances for {worldId}: {ex.Message}");
+            return false;
         }
     }
 }
