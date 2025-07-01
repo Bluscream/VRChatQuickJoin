@@ -15,24 +15,39 @@ using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
 
+
+// VRCX:
+// 2025-07-01 07:34:36,28636,"D:\SteamLibrary\steamapps\common\VRChat\launch.exe" vrchat://launch?ref=vrcx.app&id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr
+// 2025-07-01 07:34:38,29288,"D:\SteamLibrary\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch?ref=vrcx.app&id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr --startup-begin-ts=10026080162
+
 class Program
 {
     internal static readonly string exeName = Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().Location);
     internal static readonly string configFileName = $"{exeName}.json";
     internal static readonly string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configFileName);
     internal static Uri gameUri = new Uri($"vrchat://launch?ref={exeName}");
+    internal static DirectoryInfo gameDir = new DirectoryInfo(@"D:\SteamLibrary\steamapps\common\VRChat\");
+    internal static FileInfo gameLauncherExe = gameDir.CombineFile("launch.exe");
+    internal static FileInfo gameEACExe = gameDir.CombineFile("start_protected_game.exe");
     internal static AppConfig appConfig;
     internal static string[] args;
+    internal enum LaunchMode {
+        Unknown = 0,
+        Uri,
+        Launcher,
+        Steam
+    }
     public class AppConfig
     {
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public string TOTPSecret { get; set; } = "";
-        public string GroupId { get; set; } = "";
-        public string WorldId { get; set; } = "";
+        public List<string> GroupIds { get; set; } = new List<string>();
+        public List<string> WorldIds { get; set; } = new List<string>();
         public string AuthCookie { get; set; } = "";
         public string TwoFactorAuthCookie { get; set; } = "";
         public string GameArguments { get; set; } = "";
+        public LaunchMode LaunchMode { get; set; } = LaunchMode.Uri;
     }
 
     private static AppConfig LoadConfiguration()
@@ -162,54 +177,72 @@ class Program
             }
             SaveConfiguration(appConfig);
 
-            #region MAIN_LOGIC
+#region MAIN_LOGIC
 
-            if (!string.IsNullOrWhiteSpace(appConfig.GroupId))
+            // Try GroupIds in order
+            if (appConfig.GroupIds != null && appConfig.GroupIds.Count > 0)
             {
-                try
+                foreach (var groupId in appConfig.GroupIds)
                 {
-                    Console.WriteLine($"Using Group ID: {appConfig.GroupId}");
-                    var groupInstances = await groupApi.GetGroupInstancesAsync(appConfig.GroupId);
-                    Console.WriteLine($"Found {groupInstances.Count} Group Instances");
-                    var instance = groupInstances.OrderByDescending(i => i.MemberCount).FirstOrDefault();
-                    if (instance != null)
+                    try
                     {
-                        Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
-                        var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
-                        var process = Extensions.StartGame(joinLink);
-                        Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
-                        return;
+                        Console.WriteLine($"Trying Group ID: {groupId}");
+                        var groupInstances = await groupApi.GetGroupInstancesAsync(groupId);
+                        Console.WriteLine($"Found {groupInstances.Count} Group Instances");
+                        var instances = groupInstances.OrderByDescending(i => i.MemberCount);
+                        foreach (var instance in instances)
+                        {
+                            if (instance is null) continue;
+                            if (instance.MemberCount <= 0) continue; // Skip empty instances
+                            if (instance.MemberCount >= instance.World.Capacity) continue; // Skip full instances
+                            Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
+                            var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
+                            Console.WriteLine(joinLink);
+                            var process = Extensions.StartGame(joinLink);
+                            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                            return;
+                        }
+                        Console.WriteLine($"No matching instance found for group {groupId}");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error fetching group instances: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error fetching group instances for {groupId}: {ex.Message}");
+                    }
                 }
             }
 
-            if (!string.IsNullOrWhiteSpace(appConfig.WorldId))
+            // Try WorldIds in order
+            if (appConfig.WorldIds != null && appConfig.WorldIds.Count > 0)
             {
-                try
+                foreach (var worldId in appConfig.WorldIds)
                 {
-                    Console.WriteLine($"Using World ID: {appConfig.WorldId}");
-                    var world = await worldsApi.GetWorldAsync(appConfig.WorldId);
-                    Console.WriteLine($"Resolved World: \"{world.Name}\" by \"{world.AuthorName}\"");
-                    var _instance = world.Instances.OrderByDescending(i => i.Count).FirstOrDefault();
-                    if (_instance != null)
+                    try
                     {
-                        var InstanceId = _instance[0].ToString();
-                        var Location = $"{appConfig.WorldId}:{InstanceId}";
-                        var UserCount = int.Parse(_instance[1].ToString());
-                        Console.WriteLine($"Instance: {InstanceId} ({UserCount})");
-                        var joinLink = Extensions.BuildJoinLink(appConfig.WorldId, InstanceId);
-                        var process = Extensions.StartGame(joinLink);
-                        Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
-                        return;
+                        Console.WriteLine($"Trying World ID: {worldId}");
+                        var world = await worldsApi.GetWorldAsync(worldId);
+                        Console.WriteLine($"Resolved World: \"{world.Name}\" by \"{world.AuthorName}\"");
+                        var instances = world.Instances.OrderByDescending(i => i.Count);
+                        foreach (var _instance in instances) 
+                        {
+                            if (_instance is null) return;
+                            var validUserCount = int.TryParse(_instance[1].ToString(), out int userCount);
+                            if (validUserCount && userCount <= 0) continue; // Skip empty instances
+                            if (validUserCount && userCount >= _instance.Capacity) continue; // Skip full instances
+                            var InstanceId = _instance[0].ToString();
+                            var Location = $"{worldId}:{InstanceId}";
+                            Console.WriteLine($"Instance: {InstanceId} ({userCount})");
+                            var joinLink = Extensions.BuildJoinLink(worldId, InstanceId);
+                            Console.WriteLine(joinLink);
+                            var process = Extensions.StartGame(joinLink);
+                            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                            return;
+                        }
+                        Console.WriteLine("No non-empty instance found for this world.");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error fetching world instances: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error fetching world instances for {worldId}: {ex.Message}");
+                    }
                 }
             }
 
@@ -264,4 +297,110 @@ static class Extensions {
     internal static Process StartGame(Uri joinLink) {
         return Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
     }
+#region DirectoryInfo
+    public static DirectoryInfo Combine(this DirectoryInfo dir, params string[] paths)
+    {
+        var final = dir.FullName;
+        foreach (var path in paths)
+        {
+            final = Path.Combine(final, path);
+        }
+        return new DirectoryInfo(final);
+    }
+    public static bool IsEmpty(this DirectoryInfo directory)
+    {
+        return !Directory.EnumerateFileSystemEntries(directory.FullName).Any();
+    }
+    public static string StatusString(this DirectoryInfo directory, bool existsInfo = false)
+    {
+        if (directory is null) return " (is null ❌)";
+        if (File.Exists(directory.FullName)) return " (is file ❌)";
+        if (!directory.Exists) return " (does not exist ❌)";
+        if (directory.IsEmpty()) return " (is empty ⚠️)";
+        return existsInfo ? " (exists ✅)" : string.Empty;
+    }
+    public static void Copy(this DirectoryInfo source, DirectoryInfo target, bool overwrite = false)
+    {
+        Directory.CreateDirectory(target.FullName);
+        foreach (FileInfo fi in source.GetFiles())
+            fi.CopyTo(Path.Combine(target.FullName, fi.Name), overwrite);
+        foreach (DirectoryInfo diSourceSubDir in source.GetDirectories())
+            Copy(diSourceSubDir, target.CreateSubdirectory(diSourceSubDir.Name));
+    }
+    public static bool Backup(this DirectoryInfo directory, bool overwrite = false)
+    {
+        if (!directory.Exists) return false;
+        var backupDirPath = directory.FullName + ".bak";
+        if (Directory.Exists(backupDirPath) && !overwrite) return false;
+        Directory.CreateDirectory(backupDirPath);
+        foreach (FileInfo fi in directory.GetFiles()) fi.CopyTo(Path.Combine(backupDirPath, fi.Name), overwrite);
+        foreach (DirectoryInfo diSourceSubDir in directory.GetDirectories())
+        {
+            diSourceSubDir.Copy(Directory.CreateDirectory(Path.Combine(backupDirPath, diSourceSubDir.Name)), overwrite);
+        }
+        return true;
+    }
+#endregion
+ #region FileInfo
+    public static FileInfo CombineFile(this DirectoryInfo dir, params string[] paths)
+    {
+        var final = dir.FullName;
+        foreach (var path in paths)
+        {
+            final = Path.Combine(final, path);
+        }
+        return new FileInfo(final);
+    }
+    //public static FileInfo CombineFile(this DirectoryInfo absoluteDir, FileInfo relativeFile) => new FileInfo(Path.Combine(absoluteDir.FullName, relativeFile.OriginalPath));
+    public static FileInfo Combine(this FileInfo file, params string[] paths)
+    {
+        var final = file.DirectoryName;
+        foreach (var path in paths)
+        {
+            final = Path.Combine(final, path);
+        }
+        return new FileInfo(final);
+    }
+    public static string FileNameWithoutExtension(this FileInfo file)
+    {
+        return Path.GetFileNameWithoutExtension(file.Name);
+    }
+    /*public static string Extension(this FileInfo file) {
+        return Path.GetExtension(file.Name);
+    }*/
+    public static string StatusString(this FileInfo file, bool existsInfo = false)
+    {
+        if (file is null) return "(is null ❌)";
+        if (Directory.Exists(file.FullName)) return "(is directory ❌)";
+        if (!file.Exists) return "(does not exist ❌)";
+        if (file.Length < 1) return "(is empty ⚠️)";
+        return existsInfo ? "(exists ✅)" : string.Empty;
+    }
+    public static void AppendLine(this FileInfo file, string line)
+    {
+        try
+        {
+            if (!file.Exists) file.Create();
+            File.AppendAllLines(file.FullName, new string[] { line });
+        } catch { }
+    }
+    public static void WriteAllText(this FileInfo file, string text) => File.WriteAllText(file.FullName, text);
+    public static string ReadAllText(this FileInfo file) => File.ReadAllText(file.FullName);
+    public static List<string> ReadAllLines(this FileInfo file) => File.ReadAllLines(file.FullName).ToList();
+    public static bool Backup(this FileInfo file, bool overwrite = false)
+    {
+        if (!file.Exists) return false;
+        var backupFilePath = file.FullName + ".bak";
+        if (File.Exists(backupFilePath) && !overwrite) return false;
+        File.Copy(file.FullName, backupFilePath, overwrite);
+        return true;
+    }
+    public static bool Restore(this FileInfo file, bool overwrite = false)
+    {
+        if (!file.Exists || !File.Exists(file.FullName + ".bak")) return false;
+        if (overwrite) File.Delete(file.FullName);
+        File.Move(file.FullName + ".bak", file.FullName);
+        return true;
+    }
+#endregion
 }
