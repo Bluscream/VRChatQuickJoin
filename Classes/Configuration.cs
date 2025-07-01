@@ -27,6 +27,7 @@ namespace VRChatQuickJoin
             public string Password { get; set; } = "";
             public string TOTPSecret { get; set; } = "";
             public string GameArguments { get; set; } = "";
+            public List<List<string>> RunAdditional { get; set; } = new List<List<string>>();
             public LaunchMode LaunchMode { get; set; } = LaunchMode.Uri;
             public Dictionary<string, string> Ids { get; set; } = new Dictionary<string, string>();
             public string _AuthCookie { get; set; } = "";

@@ -70,8 +70,8 @@ namespace VRChatQuickJoin
                     if (cfg.App.LaunchMode == VRChatQuickJoin.Configuration.LaunchMode.SelfInvite || Utils.IsVrchatRunning())
                     {
                         await client.InviteSelf(instance.World.Id, instance.InstanceId);
-                    } else
-                    {
+                    } else {
+                        RunAdditionalApps(Program.cfg.App.RunAdditional);
                         var joinLink = Utils.BuildJoinLink(instance.World.Id, instance.InstanceId);
                         Utils.StartGame(joinLink, args);
                     }
@@ -116,6 +116,7 @@ namespace VRChatQuickJoin
                     }
                     else
                     {
+                        RunAdditionalApps(Program.cfg.App.RunAdditional);
                         var joinLink = Utils.BuildJoinLink(worldId, InstanceId);
                         Utils.StartGame(joinLink, args);
                     }
@@ -164,6 +165,7 @@ namespace VRChatQuickJoin
                 }
                 else
                 {
+                    RunAdditionalApps(Program.cfg.App.RunAdditional);
                     var joinLink = Utils.BuildJoinLink(worldId, instanceId);
                     Utils.StartGame(joinLink, args);
                 }

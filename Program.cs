@@ -126,6 +126,7 @@ internal class Program
             }
             if (!joined)
             {
+                Utils.RunAdditionalApps(cfg.App.RunAdditional);
                 Utils.StartGame(gameUri, args);
             }
             #endregion MAIN_LOGIC

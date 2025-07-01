@@ -22,6 +22,7 @@ namespace VRChatQuickJoin
             try {
                 switch (Program.cfg.App.LaunchMode) {
                     case Configuration.LaunchMode.Uri:
+                        RunAdditionalApps(Program.cfg.App.RunAdditional);
                         var joinLink = BuildJoinLink(worldId, instanceId);
                         Console.WriteLine($"Joining world {worldId} instance {instanceId} with link: {joinLink}");
                         StartGame(joinLink, additionalArgs);
@@ -70,6 +71,36 @@ namespace VRChatQuickJoin
                 }
             }
             return unique;
+        }
+        /// <summary>
+        /// Launches each additional app in the form of [binary, arg1, arg2, ...] using ShellExecute, not waiting for them to finish.
+        /// </summary>
+        /// <param name="apps">A list of apps, each as a list of strings: [binary, arg1, arg2, ...]</param>
+        internal static void RunAdditionalApps(List<List<string>> apps)
+        {
+            if (apps == null || apps.Count == 0) return;
+            foreach (var app in apps)
+            {
+                if (app == null || app.Count == 0 || string.IsNullOrWhiteSpace(app[0])) continue;
+                var binary = app[0];
+                var args = app.Count > 1 ? string.Join(" ", app.Skip(1).Select(a => a.Contains(' ') ? $"\"{a}\"" : a)) : string.Empty;
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = binary,
+                        Arguments = args,
+                        UseShellExecute = true,
+                        CreateNoWindow = true,
+                    };
+                    Process.Start(psi);
+                    Console.WriteLine($"Launched additional app: {binary} {args}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Failed to launch additional app: {binary} {args}\n{ex.Message}");
+                }
+            }
         }
     }
 }
