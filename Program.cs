@@ -65,8 +65,6 @@ class Program
                 Console.ReadKey();
                 Environment.Exit(0);
             }
-
-            // Load configuration from file
             var configJson = File.ReadAllText(configPath);
             var config = JsonConvert.DeserializeObject<AppConfig>(configJson);
 
@@ -174,8 +172,6 @@ class Program
             SaveConfiguration(appConfig);
 
 #region MAIN_LOGIC
-
-            // Try GroupIds in order
             if (appConfig.GroupIds != null && appConfig.GroupIds.Count > 0)
             {
                 foreach (var groupId in appConfig.GroupIds)
@@ -206,8 +202,6 @@ class Program
                     }
                 }
             }
-
-            // Try WorldIds in order
             if (appConfig.WorldIds != null && appConfig.WorldIds.Count > 0)
             {
                 foreach (var worldId in appConfig.WorldIds)
@@ -358,7 +352,6 @@ static class Extensions {
         }
         return new FileInfo(final);
     }
-    //public static FileInfo CombineFile(this DirectoryInfo absoluteDir, FileInfo relativeFile) => new FileInfo(Path.Combine(absoluteDir.FullName, relativeFile.OriginalPath));
     public static FileInfo Combine(this FileInfo file, params string[] paths)
     {
         var final = file.DirectoryName;
