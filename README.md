@@ -5,7 +5,7 @@
 2. Put in VRChat folder (Example: `C:\Program Files (x86)\Steam\steamapps\common\VRChat\`)
 3. Put shortcut on desktop or taskbar
 4. Launch once and let it generate `VRChatQuickJoin.json`
-5. Edit `VRChatQuickJoin.json` with your credentials, groups and or worlds
+5. Edit `VRChatQuickJoin.json` with your credentials, users, groups and or worlds
 6. Launch again and Profit!
 <hr>
 
