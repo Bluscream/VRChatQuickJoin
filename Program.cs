@@ -40,7 +40,7 @@ internal class Program
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public string TOTPSecret { get; set; } = "";
-        public List<string> Ids { get; set; } = new List<string>();
+        public Dictionary<string, string> Ids { get; set; } = new Dictionary<string, string>();
         public string AuthCookie { get; set; } = "";
         public string TwoFactorAuthCookie { get; set; } = "";
         public string GameArguments { get; set; } = "";
@@ -175,8 +175,12 @@ internal class Program
             bool joined = false;
             if (appConfig.Ids != null && appConfig.Ids.Count > 0) {
                 Console.WriteLine($"Trying {appConfig.Ids.Count} Locations");
-                foreach (var id in appConfig.Ids)
+                foreach (var kvp in appConfig.Ids)
                 {
+                    var id = kvp.Key;
+                    var comment = kvp.Value;
+                    if (!string.IsNullOrWhiteSpace(comment))
+                        Console.WriteLine($"Comment: {comment}");
                     if (await TryId(id, groupApi, worldsApi, friendsApi)) {
                         joined = true;
                         break;
