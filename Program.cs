@@ -15,7 +15,7 @@ using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
 
-class Program
+internal class Program
 {
     private static readonly FileInfo ownExe = new FileInfo(Assembly.GetExecutingAssembly().Location);
     private static readonly DirectoryInfo baseDir = ownExe.Directory;
