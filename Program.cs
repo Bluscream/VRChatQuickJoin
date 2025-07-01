@@ -17,16 +17,16 @@ using VRChat.API.Model;
 
 class Program
 {
-    internal static readonly FileInfo ownExe = new FileInfo(Assembly.GetExecutingAssembly().Location);
-    internal static readonly DirectoryInfo baseDir = ownExe.Directory;
-    internal static readonly string exeName = ownExe.FileNameWithoutExtension();
-    internal static readonly string configFileName = $"{exeName}.json";
-    internal static readonly string configPath = baseDir.CombineFile(configFileName).FullName;
+    private static readonly FileInfo ownExe = new FileInfo(Assembly.GetExecutingAssembly().Location);
+    private static readonly DirectoryInfo baseDir = ownExe.Directory;
+    private static readonly string exeName = ownExe.FileNameWithoutExtension();
+    private static readonly string configFileName = $"{exeName}.json";
+    private static readonly string configPath = baseDir.CombineFile(configFileName).FullName;
     internal static Uri gameUri = new Uri("vrchat://launch"); // ?ref={exeName}
-    internal static Uri steamUri = new Uri("steam://launch/438100/");
-    internal static DirectoryInfo gameDir = baseDir.Combine("VRChat");
-    internal static FileInfo gameLauncherExe = gameDir.CombineFile("launch.exe");
-    internal static FileInfo gameEACExe = gameDir.CombineFile("start_protected_game.exe");
+    //private static Uri steamUri = new Uri("steam://launch/438100/");
+    //private static DirectoryInfo gameDir = baseDir.Combine("VRChat");
+    //private static FileInfo gameLauncherExe = gameDir.CombineFile("launch.exe");
+    //private static FileInfo gameEACExe = gameDir.CombineFile("start_protected_game.exe");
     internal static AppConfig appConfig;
     internal static string[] args;
     internal enum LaunchMode {
@@ -259,7 +259,7 @@ class Program
 }
 
 static class Extensions {
-    public static IEnumerable<Cookie> GetAllCookies(this CookieContainer c) {
+    internal static IEnumerable<Cookie> GetAllCookies(this CookieContainer c) {
         Hashtable k = (Hashtable)c.GetType().GetField("m_domainTable", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(c);
         foreach (DictionaryEntry element in k)
         {
@@ -297,8 +297,8 @@ static class Extensions {
     internal static Process StartGame(Uri joinLink) {
         return Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
     }
-#region DirectoryInfo
-    public static DirectoryInfo Combine(this DirectoryInfo dir, params string[] paths)
+    #region DirectoryInfo
+    internal static DirectoryInfo Combine(this DirectoryInfo dir, params string[] paths)
     {
         var final = dir.FullName;
         foreach (var path in paths)
@@ -307,43 +307,14 @@ static class Extensions {
         }
         return new DirectoryInfo(final);
     }
-    public static bool IsEmpty(this DirectoryInfo directory)
+    internal static bool IsEmpty(this DirectoryInfo directory)
     {
         return !Directory.EnumerateFileSystemEntries(directory.FullName).Any();
-    }
-    public static string StatusString(this DirectoryInfo directory, bool existsInfo = false)
-    {
-        if (directory is null) return " (is null ❌)";
-        if (File.Exists(directory.FullName)) return " (is file ❌)";
-        if (!directory.Exists) return " (does not exist ❌)";
-        if (directory.IsEmpty()) return " (is empty ⚠️)";
-        return existsInfo ? " (exists ✅)" : string.Empty;
-    }
-    public static void Copy(this DirectoryInfo source, DirectoryInfo target, bool overwrite = false)
-    {
-        Directory.CreateDirectory(target.FullName);
-        foreach (FileInfo fi in source.GetFiles())
-            fi.CopyTo(Path.Combine(target.FullName, fi.Name), overwrite);
-        foreach (DirectoryInfo diSourceSubDir in source.GetDirectories())
-            Copy(diSourceSubDir, target.CreateSubdirectory(diSourceSubDir.Name));
-    }
-    public static bool Backup(this DirectoryInfo directory, bool overwrite = false)
-    {
-        if (!directory.Exists) return false;
-        var backupDirPath = directory.FullName + ".bak";
-        if (Directory.Exists(backupDirPath) && !overwrite) return false;
-        Directory.CreateDirectory(backupDirPath);
-        foreach (FileInfo fi in directory.GetFiles()) fi.CopyTo(Path.Combine(backupDirPath, fi.Name), overwrite);
-        foreach (DirectoryInfo diSourceSubDir in directory.GetDirectories())
-        {
-            diSourceSubDir.Copy(Directory.CreateDirectory(Path.Combine(backupDirPath, diSourceSubDir.Name)), overwrite);
-        }
-        return true;
     }
 #endregion
 #region FileInfo
 
-    public static FileInfo CombineFile(this DirectoryInfo dir, params string[] paths)
+    internal static FileInfo CombineFile(this DirectoryInfo dir, params string[] paths)
     {
         var final = dir.FullName;
         foreach (var path in paths)
@@ -352,7 +323,7 @@ static class Extensions {
         }
         return new FileInfo(final);
     }
-    public static FileInfo Combine(this FileInfo file, params string[] paths)
+    internal static FileInfo Combine(this FileInfo file, params string[] paths)
     {
         var final = file.DirectoryName;
         foreach (var path in paths)
@@ -361,43 +332,9 @@ static class Extensions {
         }
         return new FileInfo(final);
     }
-    public static string FileNameWithoutExtension(this FileInfo file)
+    internal static string FileNameWithoutExtension(this FileInfo file)
     {
         return Path.GetFileNameWithoutExtension(file.Name);
-    }
-    public static string StatusString(this FileInfo file, bool existsInfo = false)
-    {
-        if (file is null) return "(is null ❌)";
-        if (Directory.Exists(file.FullName)) return "(is directory ❌)";
-        if (!file.Exists) return "(does not exist ❌)";
-        if (file.Length < 1) return "(is empty ⚠️)";
-        return existsInfo ? "(exists ✅)" : string.Empty;
-    }
-    public static void AppendLine(this FileInfo file, string line)
-    {
-        try
-        {
-            if (!file.Exists) file.Create();
-            File.AppendAllLines(file.FullName, new string[] { line });
-        } catch { }
-    }
-    public static void WriteAllText(this FileInfo file, string text) => File.WriteAllText(file.FullName, text);
-    public static string ReadAllText(this FileInfo file) => File.ReadAllText(file.FullName);
-    public static List<string> ReadAllLines(this FileInfo file) => File.ReadAllLines(file.FullName).ToList();
-    public static bool Backup(this FileInfo file, bool overwrite = false)
-    {
-        if (!file.Exists) return false;
-        var backupFilePath = file.FullName + ".bak";
-        if (File.Exists(backupFilePath) && !overwrite) return false;
-        File.Copy(file.FullName, backupFilePath, overwrite);
-        return true;
-    }
-    public static bool Restore(this FileInfo file, bool overwrite = false)
-    {
-        if (!file.Exists || !File.Exists(file.FullName + ".bak")) return false;
-        if (overwrite) File.Delete(file.FullName);
-        File.Move(file.FullName + ".bak", file.FullName);
-        return true;
     }
 #endregion
 }
