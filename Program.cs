@@ -186,7 +186,7 @@ internal class Program
                     Console.WriteLine($"Trying ID: {id} ({comment})");
                     if (await TryId(id, groupApi, worldsApi, usersApi)) {
                         joined = true;
-                        //break;
+                        break;
                     }
                 }
             }
