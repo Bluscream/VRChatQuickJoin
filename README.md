@@ -18,6 +18,7 @@
   "Password": "",
   "TOTPSecret": "",
   "Ids": [
+    "usr_9ebcb36c-d65b-4e3f-99ca-14b8c73eacdf": "My cool friend",
     "grp_24b93850-e60f-4581-8a5d-c7e529f02574": "My cool group",
     "wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488": "My cool world"
   ],
