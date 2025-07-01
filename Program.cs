@@ -17,6 +17,7 @@ using VRChat.API.Model;
 
 internal class Program
 {
+    public static readonly Uri RepositoryUrl = new Uri("https://github.com/Bluscream/VRChatQuickJoin/");
     private static readonly FileInfo ownExe = new FileInfo(Assembly.GetExecutingAssembly().Location);
     private static readonly DirectoryInfo baseDir = ownExe.Directory;
     private static readonly string exeName = ownExe.FileNameWithoutExtension();
@@ -37,14 +38,17 @@ internal class Program
     }
     public class AppConfig
     {
+        //public bool Skip2FA { get; set; } = false;
+        public bool FetchGroupDetails { get; set; } = false;
+        public bool OverwriteComments { get; set; } = true;
         public string Username { get; set; } = "";
         public string Password { get; set; } = "";
         public string TOTPSecret { get; set; } = "";
+        public string GameArguments { get; set; } = "";
+        public LaunchMode LaunchMode { get; set; } = LaunchMode.Uri;
         public Dictionary<string, string> Ids { get; set; } = new Dictionary<string, string>();
         public string AuthCookie { get; set; } = "";
         public string TwoFactorAuthCookie { get; set; } = "";
-        public string GameArguments { get; set; } = "";
-        public LaunchMode LaunchMode { get; set; } = LaunchMode.Uri;
     }
 
     private static AppConfig LoadConfiguration()
@@ -116,7 +120,7 @@ internal class Program
             var authApi = new AuthenticationApi(client, client, libConfig);
             var worldsApi = new WorldsApi(client, client, libConfig);
             var groupApi = new GroupsApi(client, client, libConfig);
-            var friendsApi = new FriendsApi(client, client, libConfig);
+            var usersApi = new UsersApi(client, client, libConfig);
 
             Console.WriteLine("Logging in...");
             if (!string.IsNullOrWhiteSpace(appConfig.AuthCookie))
@@ -134,7 +138,8 @@ internal class Program
                 return;
             }
 
-            // Handle 2FA if required
+            //if (!appConfig.Skip2FA)
+            //{
             if (currentUserResp.RawContent.Contains("emailOtp"))
             {
                 Console.WriteLine("Email 2FA required");
@@ -159,7 +164,7 @@ internal class Program
                 }
                 authApi.Verify2FA(new TwoFactorAuthCode(code));
             }
-
+            //}
             var currentUser = authApi.GetCurrentUser();
             Console.WriteLine($"Logged in as {currentUser.DisplayName}");
 
@@ -169,21 +174,19 @@ internal class Program
                 if (cookie.Name == "auth") appConfig.AuthCookie = cookie.Value;
                 if (cookie.Name == "twoFactorAuth") appConfig.TwoFactorAuthCookie = cookie.Value;
             }
-            SaveConfiguration(appConfig);
 
 #region MAIN_LOGIC
             bool joined = false;
             if (appConfig.Ids != null && appConfig.Ids.Count > 0) {
-                Console.WriteLine($"Trying {appConfig.Ids.Count} Locations");
-                foreach (var kvp in appConfig.Ids)
+                Console.WriteLine($"Trying {appConfig.Ids.Count} Ids");
+                var idsCopy = new Dictionary<string, string>(appConfig.Ids);
+                foreach (var kvp in idsCopy)
                 {
-                    var id = kvp.Key;
-                    var comment = kvp.Value;
-                    if (!string.IsNullOrWhiteSpace(comment))
-                        Console.WriteLine($"Comment: {comment}");
-                    if (await TryId(id, groupApi, worldsApi, friendsApi)) {
+                    var id = kvp.Key; var comment = kvp.Value;
+                    Console.WriteLine($"Trying ID: {id} ({comment})");
+                    if (await TryId(id, groupApi, worldsApi, usersApi)) {
                         joined = true;
-                        break;
+                        //break;
                     }
                 }
             }
@@ -191,7 +194,8 @@ internal class Program
             {
                 Extensions.StartGame(gameUri);
             }
-            #endregion MAIN_LOGIC
+#endregion MAIN_LOGIC
+            SaveConfiguration(appConfig);
 
         }
         catch (ApiException ex)
@@ -210,7 +214,7 @@ internal class Program
         }
     }
 
-    static async Task<bool> TryId(string id, GroupsApi groupApi, WorldsApi worldsApi, FriendsApi friendsApi)
+    static async Task<bool> TryId(string id, GroupsApi groupApi, WorldsApi worldsApi, UsersApi usersApi)
     {
         if (id.StartsWith("grp_"))
         {
@@ -222,11 +226,12 @@ internal class Program
         }
         else if (id.StartsWith("usr_"))
         {
-            return await TryUserId(id, friendsApi, worldsApi);
+            return await TryUserId(id, usersApi, worldsApi);
         }
         else
         {
-            Console.WriteLine($"Unknown location id prefix: {id}");
+            Console.WriteLine($"Unknown or Unsupported id prefix: {id}");
+            Console.WriteLine($"Please file an issue at {RepositoryUrl}issues/new");
             return false;
         }
     }
@@ -235,7 +240,16 @@ internal class Program
     {
         try
         {
-            Console.WriteLine($"Trying Group ID: {groupId}");
+            //Console.WriteLine($"Trying Group ID: {groupId}");
+if (appConfig.FetchGroupDetails) {
+            var group = await groupApi.GetGroupAsync(groupId);
+            if (group is null)
+            {
+                Console.WriteLine($"Group {groupId} not found.");
+                return false;
+            }
+            if (appConfig.OverwriteComments) appConfig.Ids[groupId] = group.Name; // Update config with group name
+}
             var groupInstances = await groupApi.GetGroupInstancesAsync(groupId);
             Console.WriteLine($"Found {groupInstances.Count} Group Instances");
             var instances = groupInstances.OrderByDescending(i => i.MemberCount);
@@ -247,8 +261,7 @@ internal class Program
                 Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
                 var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
                 Console.WriteLine(joinLink);
-                var process = Extensions.StartGame(joinLink);
-                Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                Extensions.StartGame(joinLink);
                 return true;
             }
             Console.WriteLine($"No matching instance found for group {groupId}");
@@ -265,8 +278,13 @@ internal class Program
     {
         try
         {
-            Console.WriteLine($"Trying World ID: {worldId}");
+            //Console.WriteLine($"Trying World ID: {worldId}");
             var world = await worldsApi.GetWorldAsync(worldId);
+            if (world is null) {
+                Console.WriteLine($"World {worldId} not found.");
+                return false;
+            }
+            if (appConfig.OverwriteComments) appConfig.Ids[worldId] = $"{world.Name} by {world.AuthorName}"; // Update config with world name
             Console.WriteLine($"Resolved World: \"{world.Name}\" by \"{world.AuthorName}\"");
             var instances = world.Instances.OrderByDescending(i => i.Count);
             foreach (var _instance in instances)
@@ -280,8 +298,7 @@ internal class Program
                 Console.WriteLine($"Instance: {InstanceId} ({userCount})");
                 var joinLink = Extensions.BuildJoinLink(worldId, InstanceId);
                 Console.WriteLine(joinLink);
-                var process = Extensions.StartGame(joinLink);
-                Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+                Extensions.StartGame(joinLink);
                 return true;
             }
             Console.WriteLine($"No matching instance found for world {worldId}");
@@ -294,18 +311,19 @@ internal class Program
         }
     }
 
-    static async Task<bool> TryUserId(string userId, FriendsApi friendsApi, WorldsApi worldsApi)
+    static async Task<bool> TryUserId(string userId, UsersApi usersApi, WorldsApi worldsApi)
     {
         try
         {
-            Console.WriteLine($"Trying User ID: {userId}");
-            var user = await friendsApi.GetFriendAsync(userId);
+            //Console.WriteLine($"Trying User ID: {userId}");
+            var user = await usersApi.GetUserAsync(userId);
             if (user == null)
             {
                 Console.WriteLine($"User {userId} not found or not a friend.");
                 return false;
             }
-            if (string.IsNullOrEmpty(user.Location) || user.Location == "offline" || user.Location == "private")
+            if (appConfig.OverwriteComments) appConfig.Ids[userId] = user.DisplayName; // Update config with user display name
+            if (string.IsNullOrEmpty(user.Location) || user.Location == "traveling" || user.Location == "offline" || user.Location == "private")
             {
                 Console.WriteLine($"User {user.DisplayName} is not in a joinable location (Location: {user.Location}).");
                 return false;
@@ -322,8 +340,7 @@ internal class Program
             var instanceId = locationParts[1];
             var joinLink = Extensions.BuildJoinLink(worldId, instanceId);
             Console.WriteLine($"Joining user {user.DisplayName} at {joinLink}");
-            var process = Extensions.StartGame(joinLink);
-            Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
+            Extensions.StartGame(joinLink);
             return true;
         }
         catch (Exception ex)
@@ -371,7 +388,9 @@ static class Extensions {
         return Program.gameUri.AddQuery("id", $"{worldId}:{instanceId}", encode: false);
     }
     internal static Process StartGame(Uri joinLink) {
-        return Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
+        var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
+        Console.WriteLine($"Started game as process #{p.Id} with args \"{p.StartInfo.Arguments}\"");
+        return p;
     }
     #region DirectoryInfo
     internal static DirectoryInfo Combine(this DirectoryInfo dir, params string[] paths)

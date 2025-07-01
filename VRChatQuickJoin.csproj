@@ -154,6 +154,7 @@
     </None>
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />
+    <None Include="README.md" />
     <None Include="VRChatQuickJoin_TemporaryKey.pfx" />
   </ItemGroup>
   <ItemGroup>
