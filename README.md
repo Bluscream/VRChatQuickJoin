@@ -9,6 +9,8 @@
 6. Launch again and Profit!
 <hr>
 
+![](https://files.catbox.moe/hur245.png)
+
 ## Example `VRChatQuickJoin.json`
 ```json
 {

@@ -333,7 +333,6 @@ if (appConfig.FetchGroupDetails) {
                 return false;
             }
             Console.WriteLine($"User {user.DisplayName} is in location: {user.Location}");
-            // Location format: wrld_xxxx:instanceId~... or similar
             var locationParts = user.Location.Split(':');
             if (locationParts.Length < 2 || !locationParts[0].StartsWith("wrld_"))
             {
