@@ -172,8 +172,8 @@ internal class Program
             SaveConfiguration(appConfig);
 
 #region MAIN_LOGIC
-            if (appConfig.GroupIds != null && appConfig.GroupIds.Count > 0)
-            {
+            if (appConfig.GroupIds != null && appConfig.GroupIds.Count > 0) {
+                Console.WriteLine($"Trying {appConfig.GroupIds.Count} Groups");
                 foreach (var groupId in appConfig.GroupIds)
                 {
                     try
@@ -202,8 +202,9 @@ internal class Program
                     }
                 }
             }
-            if (appConfig.WorldIds != null && appConfig.WorldIds.Count > 0)
-            {
+            Console.WriteLine("No Group IDs found, trying World IDs instead");
+            if (appConfig.WorldIds != null && appConfig.WorldIds.Count > 0) {
+                Console.WriteLine($"Trying {appConfig.WorldIds.Count} Worlds");
                 foreach (var worldId in appConfig.WorldIds)
                 {
                     try
@@ -227,7 +228,7 @@ internal class Program
                             Console.WriteLine($"Started game as process {process.Id}\n{process.StartInfo.Arguments}");
                             return;
                         }
-                        Console.WriteLine("No non-empty instance found for this world.");
+                        Console.WriteLine($"No matching instance found for world {worldId}");
                     }
                     catch (Exception ex)
                     {
