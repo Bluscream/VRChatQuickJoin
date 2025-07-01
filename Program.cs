@@ -15,18 +15,32 @@ using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
 
-
+#region Examples
 // VRCX:
-// 2025-07-01 07:34:36,28636,"D:\SteamLibrary\steamapps\common\VRChat\launch.exe" vrchat://launch?ref=vrcx.app&id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr
-// 2025-07-01 07:34:38,29288,"D:\SteamLibrary\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch?ref=vrcx.app&id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr --startup-begin-ts=10026080162
+// 2025-07-01 07:34:36,28636,"D:\SteamLibrary\steamapps\common\VRChat\launch.exe" vrchat://launch?id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr
+// 2025-07-01 07:34:38,29288,"D:\SteamLibrary\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch?id=wrld_75f9975d-9659-428c-a0cf-b8ddcf276690:90306~private(usr_08082729-592d-4098-9a21-83c8dd37a844)~canRequestInvite~region(eu)&shortName=che8qh4t --no-vr --startup-begin-ts=10026080162
 
+// 2025-07-01 08:09:00,12800,"D:\SteamLibrary\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch?id=wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488:22232~group(grp_24b93850-e60f-4581-8a5d-c7e529f02574)~groupAccessType(plus)~region(eu)&shortName=cq5cq0w9 --no-vr --startup-begin-ts=30653831754
+
+// VRChat.com:
+// 2025-07-01 08:06:51,8804,"D:\Games\Steam\steamapps\common\VRChat\launch.exe" "vrchat://launch/?id=wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488:22232~group(grp_24b93850-e60f-4581-8a5d-c7e529f02574)~groupAccessType(plus)~region(eu)&shortName=cq5cq0w9"
+// 2025-07-01 08:06:52,11444,"D:\Games\Steam\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch/?id=wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488:22232~group(grp_24b93850-e60f-4581-8a5d-c7e529f02574)~groupAccessType(plus)~region(eu)&shortName=cq5cq0w9 --startup-begin-ts=29371367143
+
+// VRChatQuickJoin:
+// 2025-07-01 08:12:42,34172,"D:\Games\Steam\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch/?id=wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488%3a22232~group(grp_24b93850-e60f-4581-8a5d-c7e529f02574)~groupAccessType(plus)~region(eu) -no-vr --startup-begin-ts=32871461985
+// 2025-07-01 08:18:33,39740,"D:\Games\Steam\steamapps\common\VRChat\start_protected_game.exe" vrchat://launch/?id=wrld_867805a3-a057-43a7-84f3-ba1b4e6ca488:22232~group(grp_24b93850-e60f-4581-8a5d-c7e529f02574)~groupAccessType(plus)~region(eu) -no-vr --startup-begin-ts=36381514363
+
+#endregion Examples
 class Program
 {
-    internal static readonly string exeName = Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().Location);
+    internal static readonly FileInfo ownExe = new FileInfo(Assembly.GetExecutingAssembly().Location);
+    internal static readonly DirectoryInfo baseDir = ownExe.Directory;
+    internal static readonly string exeName = ownExe.FileNameWithoutExtension();
     internal static readonly string configFileName = $"{exeName}.json";
-    internal static readonly string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configFileName);
-    internal static Uri gameUri = new Uri($"vrchat://launch?ref={exeName}");
-    internal static DirectoryInfo gameDir = new DirectoryInfo(@"D:\SteamLibrary\steamapps\common\VRChat\");
+    internal static readonly string configPath = baseDir.CombineFile(configFileName).FullName;
+    internal static Uri gameUri = new Uri("vrchat://launch"); // ?ref={exeName}
+    internal static Uri steamUri = new Uri("steam://launch/438100/");
+    internal static DirectoryInfo gameDir = baseDir.Combine("VRChat");
     internal static FileInfo gameLauncherExe = gameDir.CombineFile("launch.exe");
     internal static FileInfo gameEACExe = gameDir.CombineFile("start_protected_game.exe");
     internal static AppConfig appConfig;
@@ -107,8 +121,6 @@ class Program
     static async Task Main(string[] _args)
     {
         args = _args;
-        string configFileName = $"{exeName}.json";
-        string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, configFileName);
         appConfig = LoadConfiguration();
         var libConfig = new Configuration
         {
@@ -284,15 +296,26 @@ static class Extensions {
             }
         }
     }
-    internal static Uri AddQuery(this Uri uri, string key, string value) {
+    internal static Uri AddQuery(this Uri uri, string key, string value, bool encode = true) {
         var uriBuilder = new UriBuilder(uri);
         var query = HttpUtility.ParseQueryString(uriBuilder.Query);
-        query[key] = value;
-        uriBuilder.Query = query.ToString();
+        if (encode)
+        {
+            query[key] = value;
+            uriBuilder.Query = query.ToString();
+        }
+        else
+        {
+            // Manually build the query string to avoid encoding the value
+            var queryDict = query.AllKeys.Where(k => k != null).ToDictionary(k => k, k => query[k]);
+            queryDict[key] = value; // Overwrite or add
+            var queryString = string.Join("&", queryDict.Select(kvp => $"{HttpUtility.UrlEncode(kvp.Key)}={(kvp.Key == key ? value : HttpUtility.UrlEncode(kvp.Value))}"));
+            uriBuilder.Query = queryString;
+        }
         return uriBuilder.Uri;
     }
     internal static Uri BuildJoinLink(string worldId, string instanceId) {
-        return Program.gameUri.AddQuery("id", $"{worldId}:{instanceId}");
+        return Program.gameUri.AddQuery("id", $"{worldId}:{instanceId}", encode: false);
     }
     internal static Process StartGame(Uri joinLink) {
         return Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
@@ -341,7 +364,8 @@ static class Extensions {
         return true;
     }
 #endregion
- #region FileInfo
+#region FileInfo
+
     public static FileInfo CombineFile(this DirectoryInfo dir, params string[] paths)
     {
         var final = dir.FullName;
