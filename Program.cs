@@ -14,6 +14,7 @@ using System.Web;
 using VRChat.API.Api;
 using VRChat.API.Client;
 using VRChat.API.Model;
+using System.Management;
 
 internal class Program
 {
@@ -265,7 +266,6 @@ if (appConfig.FetchGroupDetails) {
                 if (instance.MemberCount >= instance.World.Capacity) continue; // Skip full instances
                 Console.WriteLine($"Instance: {instance.InstanceId} ({instance.MemberCount})");
                 var joinLink = Extensions.BuildJoinLink(instance.World.Id, instance.InstanceId);
-                Console.WriteLine(joinLink);
                 Extensions.StartGame(joinLink);
                 return true;
             }
@@ -302,7 +302,6 @@ if (appConfig.FetchGroupDetails) {
                 var Location = $"{worldId}:{InstanceId}";
                 Console.WriteLine($"Instance: {InstanceId} ({userCount})");
                 var joinLink = Extensions.BuildJoinLink(worldId, InstanceId);
-                Console.WriteLine(joinLink);
                 Extensions.StartGame(joinLink);
                 return true;
             }
@@ -357,6 +356,26 @@ if (appConfig.FetchGroupDetails) {
 }
 
 static class Extensions {
+    internal static string GetCommandLine(this Process process) {
+        if (process == null)
+        {
+            throw new ArgumentNullException(nameof(process));
+        }
+
+        try
+        {
+            using (var searcher = new ManagementObjectSearcher("SELECT CommandLine FROM Win32_Process WHERE ProcessId = " + process.Id))
+            using (var objects = searcher.Get())
+            {
+                var result = objects.Cast<ManagementBaseObject>().SingleOrDefault();
+                return result?["CommandLine"]?.ToString() ?? string.Empty;
+            }
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
     internal static IEnumerable<Cookie> GetAllCookies(this CookieContainer c) {
         Hashtable k = (Hashtable)c.GetType().GetField("m_domainTable", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(c);
         foreach (DictionaryEntry element in k)
@@ -394,7 +413,9 @@ static class Extensions {
     }
     internal static Process StartGame(Uri joinLink) {
         var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = $"{Program.appConfig.GameArguments}{string.Join(" ", Program.args)}" });
-        Console.WriteLine($"Started game as process #{p.Id} with args \"{p.StartInfo.Arguments}\"");
+        //Console.WriteLine($"Started game as process #{p.Id} with args \"{p.StartInfo.Arguments}\"");
+        var commandLine = p.GetCommandLine();
+        Console.WriteLine($"{commandLine}");
         return p;
     }
     #region DirectoryInfo
