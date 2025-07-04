@@ -59,7 +59,10 @@ namespace VRChatQuickJoin
             {
                 args += " --no-vr -vrmode None";
             }
-                var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = args });
+# if DEBUG
+            return null;
+#endif
+            var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = args });
             //Console.WriteLine($"Started game as process #{p.Id} with args \"{p.StartInfo.Arguments}\"");
             var commandLine = p.GetCommandLine();
             Console.WriteLine($"{commandLine}");
