@@ -30,6 +30,7 @@ namespace VRChatQuickJoin
             public List<List<string>> RunAdditional { get; set; } = new List<List<string>>();
             public LaunchMode LaunchMode { get; set; } = LaunchMode.Uri;
             public Dictionary<string, string> Ids { get; set; } = new Dictionary<string, string>();
+            public string UserAgent { get; set; } = "VRCQuickJoin/1.0";
             public string _AuthCookie { get; set; } = "";
             public string _TwoFactorAuthCookie { get; set; } = "";
         }

@@ -7,6 +7,8 @@ namespace VRChatQuickJoin
 {
     static class Utils
     {
+        internal static bool IsVirtualDesktopConnected() => Process.GetProcessesByName("VRServer").Any();
+        internal static bool IsSteamVRRunning() => Process.GetProcessesByName("vrmonitor").Any() && Process.GetProcessesByName("vrcompositor").Any();
         internal static bool IsVrchatRunning() => Process.GetProcessesByName("VRChat").Any();
         internal static Uri BuildJoinLink(string worldId, string instanceId)
         {
@@ -49,7 +51,15 @@ namespace VRChatQuickJoin
         internal static Process StartGame(Uri joinLink, List<string> additionalArgs = null)
         {
             // $"{Program.cfg.App.GameArguments}{string.Join(" ", Program.args)}"
-            var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = JoinArgs(Program.cfg.App.GameArguments.Split(' '), additionalArgs) });
+            var args = JoinArgs(Program.cfg.App.GameArguments.Split(' '), additionalArgs);
+            if (Program.useVR)
+            {
+                args += "--vrmode OpenVR";
+            } else
+            {
+                args += " --no-vr -vrmode None";
+            }
+                var p = Process.Start(new ProcessStartInfo(joinLink.ToString()) { UseShellExecute = true, Arguments = args });
             //Console.WriteLine($"Started game as process #{p.Id} with args \"{p.StartInfo.Arguments}\"");
             var commandLine = p.GetCommandLine();
             Console.WriteLine($"{commandLine}");

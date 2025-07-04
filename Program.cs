@@ -28,12 +28,14 @@ internal class Program
     private static readonly DirectoryInfo baseDir = ownExe.Directory;
     private static readonly string exeName = ownExe.FileNameWithoutExtension();
     internal static Uri gameUri = new Uri("vrchat://launch"); // ?ref={exeName}
-    //private static Uri steamUri = new Uri("steam://launch/438100/");
+    private static Uri steamUri = new Uri("steam://launch/438100/");
+    private static Uri steamVrUri = new Uri("steam://rungameid/250820"); // SteamVR
     //private static DirectoryInfo gameDir = baseDir.Combine("VRChat");
     //private static FileInfo gameLauncherExe = gameDir.CombineFile("launch.exe");
     //private static FileInfo gameEACExe = gameDir.CombineFile("start_protected_game.exe");
     internal static VrcApiClient client;
     internal static Configuration cfg;
+    internal static bool useVR;
     internal static List<string> args;
     static async Task Main(string[] _args)
     {
@@ -44,10 +46,21 @@ internal class Program
 
         try
         {
+            var steamVR = Utils.IsSteamVRRunning();
+            if (Utils.IsVirtualDesktopConnected() && !steamVR)
+            {
+                var steamVrProcess = Process.Start(new ProcessStartInfo(steamVrUri.ToString()) { UseShellExecute = true });
+                Console.WriteLine("Virtual Desktop connected, but SteamVR is not running. Starting SteamVR...");
+                useVR = true;
+            } else if (steamVR) {
+                Console.WriteLine("SteamVR is running, using VR mode.");
+                useVR = true;
+            }
+
             client = new VrcApiClient();
             client.Configuration = new VRChat.API.Client.Configuration()
             {
-                UserAgent = "VRChatQuickJoin/1.0",
+                UserAgent = cfg.App.UserAgent,
                 Username = cfg.App.Username,
                 Password = cfg.App.Password
             };
@@ -130,18 +143,19 @@ internal class Program
                 Utils.StartGame(gameUri, args);
             }
             #endregion MAIN_LOGIC
-            cfg.SaveConfiguration();
 
         }
         catch (ApiException ex)
         {
             Console.WriteLine($"API Error: {ex.Message}");
             Console.WriteLine($"Status Code: {ex.ErrorCode}");
+            Utils.StartGame(gameUri, args);
         }
         //catch (Exception ex)
         //{
         //    Console.WriteLine($"Error: {ex.Message}");
         //}
+        cfg.SaveConfiguration();
         if (cfg.App.WaitOnExit)
         {
             Console.WriteLine("Press any key to exit...");
