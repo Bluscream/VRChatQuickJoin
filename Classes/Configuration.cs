@@ -8,6 +8,7 @@ namespace VRChatQuickJoin
     internal class Configuration
     {
         private FileInfo file;
+        private string LoadedJson;
         internal AppConfig App = new AppConfig();
         internal enum LaunchMode
         {
@@ -50,16 +51,15 @@ namespace VRChatQuickJoin
                 {
                     Console.WriteLine($"Configuration file not found. Creating default configuration file at\n\"{file.FullName}\"");
                     var defaultConfig = new AppConfig { };
-                    var json = JsonConvert.SerializeObject(defaultConfig, Formatting.Indented);
-                    file.WriteAllText(json);
+                    SaveConfiguration(file, defaultConfig, null);
 
                     Console.WriteLine("Default configuration file created. Please edit it with your credentials and run the application again.");
                     Console.WriteLine("Press any key to exit...");
                     Console.ReadKey();
                     Environment.Exit(0);
                 }
-                var configJson = file.ReadAllText();
-                App = JsonConvert.DeserializeObject<AppConfig>(configJson);
+                LoadedJson = file.ReadAllText();
+                App = JsonConvert.DeserializeObject<AppConfig>(LoadedJson);
 
                 if (App == null)
                 {
@@ -78,16 +78,19 @@ namespace VRChatQuickJoin
                 return null;
             }
         }
-        internal bool SaveConfiguration() => SaveConfiguration(file, App);
-        internal bool SaveConfiguration(AppConfig appConfig) => SaveConfiguration(file, appConfig);
-        private static bool SaveConfiguration(FileInfo file, AppConfig appConfig)
+        internal bool SaveConfiguration() => SaveConfiguration(file, App, LoadedJson);
+        internal bool SaveConfiguration(AppConfig appConfig) => SaveConfiguration(file, appConfig, LoadedJson);
+        private static bool SaveConfiguration(FileInfo file, AppConfig appConfig, string loadedJson = null)
         {
             try
             {
-                Console.WriteLine($"Saving configuration to \"{file.FullName}\"");
                 var json = JsonConvert.SerializeObject(appConfig, Formatting.Indented);
-                file.WriteAllText(json);
-                Console.WriteLine("Configuration saved successfully.");
+                if (string.IsNullOrWhiteSpace(loadedJson) || json != loadedJson) {
+                    Console.WriteLine($"Saving configuration to \"{file.FullName}\"");
+                    file.WriteAllText(json);
+                    Console.WriteLine("Configuration saved successfully.");
+                    loadedJson = json;
+                }
                 return true;
             }
             catch (Exception ex)
